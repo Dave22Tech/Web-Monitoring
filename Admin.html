@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Update Data Monitoring</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0b0f19; color: #ffffff; padding: 3rem 0; }
+        .main-container { max-width: 800px; background: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 2.5rem; margin: auto; }
+        .form-control-dark { background-color: #111827 !important; border: 1px solid #4b5563 !important; color: #ffffff !important; }
+        .progress-box { display: none; background: #1e293b; padding: 15px; border-radius: 8px; border: 1px solid #334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-container">
+            <h3 class="fw-bold mb-1 text-primary">⚙️ Panel Admin Monitoring</h3>
+            <p class="text-muted mb-4">Unggah file Excel untuk memperbarui database publik secara langsung.</p>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold">Pilih File Excel (.xlsx)</label>
+                <input type="file" id="uploadExcel" class="form-control form-control-dark" accept=".xlsx">
+            </div>
+
+            <div id="progressContainer" class="progress-box mb-4">
+                <div class="d-flex justify-content-between mb-1">
+                    <span id="progressText" class="text-warning fw-semibold">Memproses data...</span>
+                    <span id="progressPercent" class="text-warning fw-bold">0%</span>
+                </div>
+                <div class="progress" style="height: 8px; background-color: #334155;">
+                    <div id="progressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div id="alertBox"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        const SUPABASE_URL = 'https://bxngdadskdeobjaobslh.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4bmdkYWRza2Rlb2JqYW9ic2xoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5OTI5NTQsImV4cCI6MjEwNDU2ODk1NH0.HJ5uVpZP0AqNmN_wxv3bG2V9RfH3hyAsV3j2SujjiJ8';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        document.getElementById('uploadExcel').addEventListener('change', async function(e) {
+            let fileInput = e.target.files[0];
+            if (!fileInput) return;
+
+            let pBox = document.getElementById('progressContainer');
+            let pText = document.getElementById('progressText');
+            let pBar = document.getElementById('progressBar');
+            let pPercent = document.getElementById('progressPercent');
+            let alertBox = document.getElementById('alertBox');
+
+            alertBox.innerHTML = "";
+            pBox.style.display = 'block';
+            pText.innerText = "⏳ Membaca file Excel...";
+            pBar.style.width = "20%"; pPercent.innerText = "20%";
+
+            let reader = new FileReader();
+            reader.readAsArrayBuffer(fileInput);
+            reader.onload = async function(e) {
+                try {
+                    let arrayBuffer = e.target.result;
+                    const workbook = new ExcelJS.Workbook();
+                    await workbook.xlsx.load(arrayBuffer);
+                    
+                    let dataMon = [];
+                    let dataHist = {};
+
+                    let sheetMonitor = workbook.worksheets.find(w => w.name && w.name.toUpperCase().includes("MONITOR"));
+                    let sheetHistorical = workbook.worksheets.find(w => w.name && w.name.toUpperCase().includes("HISTOR"));
+
+                    pBar.style.width = "40%"; pPercent.innerText = "40%";
+
+                    if (sheetMonitor) {
+                        let headerRowIndex = -1, colUnitCode = -1, colModelUnit = -1, colDateExp = -1;
+
+                        sheetMonitor.eachRow((row, rowIndex) => {
+                            if (headerRowIndex !== -1 || !row.values) return;
+                            let rowValues = Array.from(row.values).map(v => v ? String(v).trim().toUpperCase() : "");
+                            
+                            if (rowValues.some(text => text && text.includes("UNIT CODE")) || rowValues.some(text => text && text.includes("DATE EXP"))) {
+                                headerRowIndex = rowIndex;
+                                colUnitCode = rowValues.findIndex(text => text && text.includes("UNIT CODE"));
+                                colModelUnit = rowValues.findIndex(text => text && text.includes("MODEL UNIT"));
+                                colDateExp = rowValues.findIndex(text => text && (text.includes("DATE EXP") || text.includes("EXP")));
+                            }
+                        });
+
+                        if (headerRowIndex !== -1 && colUnitCode !== -1) {
+                            sheetMonitor.eachRow((row, rowIndex) => {
+                                if (rowIndex <= headerRowIndex) return;
+
+                                let codeVal = row.getCell(colUnitCode).text ? row.getCell(colUnitCode).text.trim() : "";
+                                let modelVal = row.getCell(colModelUnit).text ? row.getCell(colModelUnit).text.trim() : "-";
+                                let dateVal = row.getCell(colDateExp !== -1 ? colDateExp : 4).value;
+
+                                if (!codeVal && !dateVal) return;
+                                dataMon.push({ code: codeVal, model: modelVal, dateRaw: dateVal });
+                            });
+                        }
+                    }
+
+                    pBar.style.width = "60%"; pPercent.innerText = "60%";
+
+                    if (sheetHistorical) {
+                        let colUnitCodeHist = -1, colDeviasi = -1, colStatusDev = -1, startRow = -1;
+
+                        sheetHistorical.eachRow((row, rowIndex) => {
+                            if (startRow !== -1 || !row.values) return;
+                            let rowValues = Array.from(row.values).map(v => v ? String(v).trim().toUpperCase() : "");
+                            
+                            if (rowValues.includes("UNIT CODE") || rowValues.includes("DEVIASI COM")) {
+                                colUnitCodeHist = rowValues.indexOf("UNIT CODE");
+                                colDeviasi = rowValues.indexOf("DEVIASI COM");
+                                colStatusDev = rowValues.findIndex(text => text && (text.includes("STATUS DEVIASI") || text.includes("STATUS")));
+                                startRow = rowIndex + 1;
+                            }
+                        });
+
+                        if (startRow !== -1 && colUnitCodeHist !== -1) {
+                            sheetHistorical.eachRow((row, rowIndex) => {
+                                if (rowIndex < startRow) return;
+                                let code = row.getCell(colUnitCodeHist).text ? row.getCell(colUnitCodeHist).text.trim() : "";
+                                let deviasi = row.getCell(colDeviasi).text ? row.getCell(colDeviasi).text.trim() : "";
+                                let statusDev = (colStatusDev !== -1) ? row.getCell(colStatusDev).text.trim() : "";
+
+                                if (code) {
+                                    dataHist[code.toUpperCase()] = { textDeviasi: deviasi, statusTeks: statusDev || "-" };
+                                }
+                            });
+                        }
+                    }
+
+                    pBar.style.width = "80%"; pPercent.innerText = "80%";
+                    pText.innerText = "📤 Menyinkronkan ke Cloud Database...";
+
+                    let payloadSupabase = dataMon.map(item => {
+                        let parsedDate = parseExcelDate(item.dateRaw);
+                        let isoDate = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString().split('T')[0] : null;
+
+                        let histObj = dataHist[item.code.toUpperCase()];
+                        let temuanAktif = "";
+                        let statusTeks = "-";
+
+                        if (histObj && histObj.textDeviasi) {
+                            statusTeks = histObj.statusTeks.trim();
+                            let barisDeviasi = histObj.textDeviasi.split(/\r?\n/);
+                            let deviasiFiltered = barisDeviasi.map(line => line.trim()).filter(line => {
+                                if (!line) return false;
+                                let lowerLine = line.toLowerCase();
+                                return !lowerLine.includes('done') && !lowerLine.includes('✅') && !lowerLine.includes('selesai');
+                            });
+
+                            if (deviasiFiltered.length > 0) temuanAktif = deviasiFiltered.join('\n');
+                        }
+
+                        return {
+                            unit_code: item.code.toUpperCase(),
+                            model_unit: item.model,
+                            date_exp: isoDate,
+                            text_deviasi: temuanAktif,
+                            status_deviasi: statusTeks,
+                            updated_at: new Date().toISOString()
+                        };
+                    });
+
+                    const { error } = await supabaseClient
+                        .from('unit_monitoring')
+                        .upsert(payloadSupabase, { onConflict: 'unit_code' });
+
+                    if (error) throw error;
+
+                    pBar.style.width = "100%"; pPercent.innerText = "100%";
+                    pText.innerText = "Selesai!";
+
+                    alertBox.innerHTML = `<div class="alert alert-success mt-3">✅ Berhasil memperbarui ${payloadSupabase.length} data ke Cloud Database! Web publik sudah otomatis ter-update.</div>`;
+
+                } catch (err) {
+                    alertBox.innerHTML = `<div class="alert alert-danger mt-3">🚫 Gagal memproses: ${err.message}</div>`;
+                }
+            };
+        });
+
+        function parseExcelDate(dateInput) {
+            if (dateInput instanceof Date) return dateInput;
+            if (dateInput && typeof dateInput === 'object' && dateInput.result instanceof Date) return dateInput.result;
+            let dateStr = String(dateInput).trim();
+            if (!dateStr || dateStr === "undefined" || dateStr === "-") return new Date(NaN);
+
+            let parsed = new Date(dateStr);
+            if (!isNaN(parsed.getTime())) return parsed;
+
+            let parts = dateStr.split('-');
+            if (parts.length === 3) {
+                let day = parseInt(parts[0], 10);
+                let monthStr = parts[1].toLowerCase();
+                let year = parseInt(parts[2], 10);
+                let months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+                let month = months.indexOf(monthStr.substring(0, 3));
+                if (year < 100) year += 2000;
+                if (month !== -1 && !isNaN(day) && !isNaN(year)) return new Date(year, month, day);
+            }
+            return new Date(NaN);
+        }
+    </script>
+</body>
+</html>

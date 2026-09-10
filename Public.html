@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring & Deviasi Unit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0b0f19; color: #ffffff; padding: 2rem 0; }
+        .main-container { max-width: 1550px; background: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 2.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); margin: auto; }
+        h3.title-app { font-weight: 700; color: #ffffff; letter-spacing: -0.5px; }
+        h3.title-app span { color: #38bdf8; }
+        
+        .form-control-dark { 
+            background-color: #111827 !important; 
+            border: 1px solid #4b5563 !important; 
+            color: #ffffff !important; 
+            border-radius: 8px; 
+        }
+        .form-control-dark option { background-color: #111827 !important; color: #ffffff !important; }
+        .form-control-dark::placeholder { color: #9ca3af !important; opacity: 1; }
+
+        .table-responsive { border-radius: 12px; overflow: hidden; border: 1px solid #374151; max-height: 700px; overflow-y: auto; }
+        .table-premium { margin-bottom: 0; color: #ffffff !important; border-collapse: separate; border-spacing: 0; }
+        .table-premium thead th { position: sticky; top: 0; z-index: 10; background-color: #1f2937; color: #38bdf8; font-weight: 700; text-transform: uppercase; font-size: 0.85rem; padding: 16px; border-bottom: 2px solid #374151; }
+        
+        .table-premium tbody td { background-color: #111827; padding: 16px; border-bottom: 1px solid #1f2937; font-size: 0.95rem; color: #ffffff !important; }
+        .table-premium tbody tr:hover td { background-color: #1f2937 !important; }
+        
+        .text-deviasi { white-space: pre-line; font-size: 0.95rem; color: #f3f4f6 !important; line-height: 1.5; }
+        .text-kosong-terang { color: #9ca3af !important; font-style: italic; }
+        
+        .table-premium tr.row-expired td { background-color: #2d1919 !important; color: #fca5a5 !important; }
+        .table-premium tr.row-warning-14 td { background-color: #3b2010 !important; color: #fdba74 !important; }
+        .table-premium tr.row-warning td { background-color: #382613 !important; color: #fef08a !important; }
+        .table-premium tr.row-attention td { background-color: #2c2e15 !important; color: #fef08a !important; }
+        .table-premium tr.row-aman td { background-color: #142918 !important; color: #a7f3d0 !important; }
+        
+        .badge-premium { padding: 8px 16px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; display: inline-block; }
+        .badge-open { background-color: #ef4444; color: #ffffff !important; }
+        .badge-progres { background-color: #ea580c; color: #ffffff !important; } 
+        .badge-close { background-color: #10b981; color: #ffffff !important; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="title-app">📊 Monitor Expired & Deviasi <span>Unit</span></h3>
+                <span class="badge bg-success text-white fw-bold">Live Cloud Engine</span>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-5">
+                    <input type="text" id="cariInput" class="form-control form-control-dark" placeholder="🔍 Cari UNIT CODE (bisa pisah koma: CP44, CP45)..." onkeyup="filterData()">
+                </div>
+                <div class="col-md-4">
+                    <input type="text" id="cariStatusDeviasi" class="form-control form-control-dark" placeholder="🔍 Cari STATUS DEVIASI (OPEN, PROGRES, CLOSE)..." onkeyup="filterData()">
+                </div>
+                <div class="col-md-3">
+                    <select id="filterStatus" class="form-select form-control-dark" onchange="filterData()">
+                        <option value="all">Semua Status Expired</option>
+                        <option value="warning_14">⏰ Kritis (&lt; 14 Hari)</option>
+                        <option value="warning">⚠️ Warning (&lt; 1 Bulan)</option>
+                        <option value="attention">⚠️ Attention (&lt; 2 Bulan)</option>
+                        <option value="aman">✅ Aman (&lt; 3 Bulan)</option>
+                        <option value="sangat_aman">✨ Sangat Aman (&gt; 3 Bulan)</option>
+                        <option value="expired">🚫 Expired</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-premium align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">UNIT CODE</th>
+                            <th style="width: 15%;">MODEL UNIT</th>
+                            <th style="width: 12%;">Date Exp</th>
+                            <th style="width: 18%;">Status Expired</th>
+                            <th style="width: 28%;">Daftar Temuan (Deviasi Com)</th>
+                            <th style="width: 12%;" class="text-center">Status Deviasi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelData">
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">Memuat data dari database...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="d-flex justify-content-between mt-3">
+                <small class="text-muted" id="lastUpdated">Terakhir diperbarui: -</small>
+                <small class="text-muted" id="rowCount">0 data ditampilkan</small>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // KREDENSIAL SUPABASE
+        const SUPABASE_URL = 'https://bxngdadskdeobjaobslh.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4bmdkYWRza2Rlb2JqYW9ic2xoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5OTI5NTQsImV4cCI6MjEwNDU2ODk1NH0.HJ5uVpZP0AqNmN_wxv3bG2V9RfH3hyAsV3j2SujjiJ8';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let dataGabungan = [];
+
+        async function muatDataPublik() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('unit_monitoring')
+                    .select('*')
+                    .order('unit_code', { ascending: true });
+
+                if (error) throw error;
+
+                let hariIni = new Date();
+                hariIni.setHours(0,0,0,0);
+
+                dataGabungan = data.map(row => {
+                    let expDate = row.date_exp ? new Date(row.date_exp) : new Date(NaN);
+                    let status = "Sangat Aman (> 3 Bulan)";
+                    let classWarnaRow = "";
+                    let tglTeks = "-";
+                    let sHari = 999;
+
+                    if (!isNaN(expDate.getTime())) {
+                        tglTeks = expDate.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                        sHari = Math.ceil((expDate.getTime() - hariIni.getTime()) / (1000 * 3600 * 24));
+                        
+                        if (sHari < 0) { status = "Expired"; classWarnaRow = "row-expired"; }
+                        else if (sHari <= 14) { status = "Kritis (< 14 Hari)"; classWarnaRow = "row-warning-14"; }
+                        else if (sHari <= 30) { status = "Warning (< 1 Bulan)"; classWarnaRow = "row-warning"; }
+                        else if (sHari <= 60) { status = "Attention (< 2 Bulan)"; classWarnaRow = "row-attention"; }
+                        else if (sHari <= 90) { status = "Aman (< 3 Bulan)"; classWarnaRow = "row-aman"; }
+                    } else {
+                        status = "Format Tanggal Kosong/Salah";
+                    }
+
+                    let deviasiHtml = row.text_deviasi 
+                        ? row.text_deviasi 
+                        : `<span class="text-kosong-terang">- Tidak ada temuan deviasi -</span>`;
+
+                    let statusTeksMentah = row.status_deviasi || "-";
+                    let badgeStatusHtml = `<span class="text-kosong-terang">-</span>`;
+                    let statusUpper = statusTeksMentah.toUpperCase().trim();
+
+                    if (statusUpper === "OPEN") badgeStatusHtml = `<span class="badge-premium badge-open">OPEN</span>`;
+                    else if (statusUpper === "PROGRES" || statusUpper === "PROGRESS") badgeStatusHtml = `<span class="badge-premium badge-progres">PROGRES</span>`;
+                    else if (statusUpper === "CLOSE" || statusUpper === "CLOSED") badgeStatusHtml = `<span class="badge-premium badge-close">CLOSE</span>`;
+                    else if (statusTeksMentah !== "-") badgeStatusHtml = `<span class="badge-premium bg-secondary text-white">${statusTeksMentah}</span>`;
+
+                    return {
+                        code: row.unit_code,
+                        model: row.model_unit || "-",
+                        tgl: tglTeks,
+                        status: status,
+                        selisihHari: sHari,
+                        classWarna: classWarnaRow,
+                        deviasi: deviasiHtml,
+                        statusDeviasiHtml: badgeStatusHtml,
+                        statusDeviasiTeks: statusTeksMentah,
+                        updatedAt: row.updated_at
+                    };
+                });
+
+                if(data.length > 0 && data[0].updated_at) {
+                    let lastUpdateDate = new Date(data[0].updated_at);
+                    document.getElementById('lastUpdated').innerText = `Terakhir diperbarui: ${lastUpdateDate.toLocaleString('id-ID')}`;
+                }
+
+                tampilkanData(dataGabungan);
+
+            } catch (err) {
+                document.getElementById('tabelData').innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger">Gagal memuat data: ${err.message}</td></tr>`;
+            }
+        }
+
+        function tampilkanData(data) {
+            let html = "";
+            data.forEach(row => {
+                let statusFormatted = row.status;
+                if(row.classWarna === 'row-warning-14') statusFormatted = `⏰ ${row.status}`;
+                if(row.classWarna === 'row-warning') statusFormatted = `⚠️ ${row.status}`;
+                if(row.classWarna === 'row-attention') statusFormatted = `⚡ ${row.status}`;
+                if(row.classWarna === 'row-expired') statusFormatted = `🚫 ${row.status}`;
+                if(row.classWarna === 'row-aman') statusFormatted = `✅ ${row.status}`;
+
+                html += `<tr class="${row.classWarna}">
+                    <td><strong style="color: inherit;">${row.code}</strong></td>
+                    <td style="color: inherit;">${row.model}</td>
+                    <td style="color: inherit;">${row.tgl}</td>
+                    <td><strong style="color: inherit;">${statusFormatted}</strong></td>
+                    <td><div class="text-deviasi" style="color: inherit;">${row.deviasi}</div></td>
+                    <td class="text-center">${row.statusDeviasiHtml}</td>
+                </tr>`;
+            });
+
+            document.getElementById('tabelData').innerHTML = html || '<tr><td colspan="6" class="text-center py-4 text-muted">Data tidak ditemukan</td></tr>';
+            document.getElementById('rowCount').innerText = `${data.length} data displayed`;
+        }
+
+        function filterData() {
+            let inputCari = document.getElementById('cariInput').value.toLowerCase();
+            let cariStatusDev = document.getElementById('cariStatusDeviasi').value.toLowerCase();
+            let status = document.getElementById('filterStatus').value;
+            
+            let kumpulanCode = inputCari.split(',').map(item => item.trim()).filter(item => item.length > 0);
+            
+            let hasil = dataGabungan.filter(row => {
+                let cocokCode = true;
+                if (kumpulanCode.length > 0) {
+                    cocokCode = kumpulanCode.some(code => row.code.toLowerCase().includes(code));
+                }
+                
+                let cocokStatusDev = row.statusDeviasiTeks.toLowerCase().includes(cariStatusDev);
+                let cocokStatus = true;
+                
+                if (status === "warning_14") cocokStatus = (row.selisihHari >= 0 && row.selisihHari <= 14);
+                if (status === "warning") cocokStatus = row.status.includes("Warning");
+                if (status === "attention") cocokStatus = row.status.includes("Attention");
+                if (status === "aman") cocokStatus = row.status.includes("Aman (< 3 Bulan)");
+                if (status === "sangat_aman") cocokStatus = row.status.includes("Sangat Aman");
+                if (status === "expired") cocokStatus = row.status === "Expired";
+                
+                return cocokCode && cocokStatusDev && cocokStatus;
+            });
+
+            tampilkanData(hasil);
+        }
+
+        document.addEventListener('DOMContentLoaded', muatDataPublik);
+    </script>
+</body>
+</html>
